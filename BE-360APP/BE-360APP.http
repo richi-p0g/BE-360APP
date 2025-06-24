@@ -1,0 +1,6 @@
+@BE_360APP_HostAddress = http://localhost:5166
+
+GET {{BE_360APP_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
