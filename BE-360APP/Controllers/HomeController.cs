@@ -51,6 +51,39 @@ namespace BE_360APP.Controllers
             }
         }
 
+
+
+        [HttpPost]
+        [Route("master/value")]
+        public async Task<IActionResult> masterValue([FromBody] string dto)
+        {
+            try
+            {
+                var dt = await _repo.masterValues();
+                return Requests.Response(this, new ApiStatus(200), dt, $"Read Data Successfully");
+            }
+            catch (Exception ex)
+            {
+                return Requests.Response(this, new ApiStatus(500), null, ex.Message);
+            }
+        }
+
+        [HttpPost]
+        [Route("AssignToOther/RowSave")]
+        public async Task<IActionResult> AssignToOtherRowSave([FromBody] AssignToOtherDto dto)
+        {
+            try
+            {
+                var dt = await _repo.AssignToOtherRowSaves(dto);
+                return Requests.Response(this, new ApiStatus(200), dt, dt.Msg);
+            }
+            catch (Exception ex)
+            {
+                return Requests.Response(this, new ApiStatus(500), null, ex.Message);
+            }
+        }
+
+
         [HttpPost]
         [Route("Auth/Register/LookupFullName")]
         public async Task<IActionResult> LookupFullName([FromBody] usernameDto dto)
@@ -74,7 +107,7 @@ namespace BE_360APP.Controllers
             try
             {
                 var dt = await _repo.Registers(dto);
-                return Requests.Response(this, new ApiStatus(200), dt, $"Insert Successfully");
+                return Requests.Response(this, new ApiStatus(200), dt, dt.Msg);
             }
             catch (Exception ex)
             {
