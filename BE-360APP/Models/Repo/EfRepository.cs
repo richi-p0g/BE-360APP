@@ -2,6 +2,7 @@
 using System.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using MySqlConnector;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace BE_360APP.Models.Repo
 {
@@ -16,7 +17,7 @@ namespace BE_360APP.Models.Repo
             try
             {
                 var rspn = new Response();
-                using (var connection = new MySqlConnection(_config.GetConnectionString("DefaultConnection")))
+                using (var connection = new MySqlConnection(_config.GetConnectionString("360dbConn")))
                 {
                     connection.Open();
 
@@ -93,17 +94,23 @@ namespace BE_360APP.Models.Repo
             }
         }
 
-        public async Task<mastervalues> masterValues()
+        public async Task<allmasters> allMasters()
         {
             try
             {
                 var f = new List<finalValue>();
                 var q = new List<quickValue>();
-                var mst = new mastervalues();
-                using (var connection = new MySqlConnection(_config.GetConnectionString("DefaultConnection")))
+                var s = new List<status>();
+                var ss = new List<signstatus>();
+                var mst = new allmasters();
+                using (var connection = new MySqlConnection(_config.GetConnectionString("360dbConn")))
                 {
                     connection.Open();
-                    MySqlCommand cmdA = new MySqlCommand($" Select * from finalvalue ", connection);
+                    MySqlCommand cmdA = new MySqlCommand($" Select value, Description from finalvalue ", connection);
+                    MySqlCommand cmdB = new MySqlCommand($" Select value, Description from quickvalue ", connection);
+                    MySqlCommand cmdC = new MySqlCommand($" Select Description from status ", connection);
+                    MySqlCommand cmdD = new MySqlCommand($" Select Description from signstatus ", connection);
+
                     using (var reader = await cmdA.ExecuteReaderAsync())
                     {
                         while (reader.Read())
@@ -116,7 +123,6 @@ namespace BE_360APP.Models.Repo
                         }
                     }
 
-                    MySqlCommand cmdB = new MySqlCommand($" Select * from quickvalue ", connection);
                     using (var reader = await cmdB.ExecuteReaderAsync())
                     {
                         while (reader.Read())
@@ -128,10 +134,33 @@ namespace BE_360APP.Models.Repo
                             });
                         }
                     }
-                    connection.Close();
 
+                    using (var reader = await cmdC.ExecuteReaderAsync())
+                    {
+                        while (reader.Read())
+                        {
+                            s.Add(new status
+                            {
+                                statusvalue = (string)reader["Description"],
+                            });
+                        }
+                    }
+
+                    using (var reader = await cmdD.ExecuteReaderAsync())
+                    {
+                        while (reader.Read())
+                        {
+                            ss.Add(new signstatus
+                            {
+                                signstatusvalue = (string)reader["Description"],
+                            });
+                        }
+                    }
                     mst.finals.AddRange(f);
                     mst.quicks.AddRange(q);
+                    mst.status.AddRange(s);
+                    mst.signstatus.AddRange(ss);
+                    connection.Close();
 
                     return mst;
                 }
@@ -143,26 +172,105 @@ namespace BE_360APP.Models.Repo
         }
 
 
+        public async Task<List<projectOpty>> masterProjectopties()
+        {
+            try
+            {
+                var mst = new List<projectOpty>();
+                using (var connection = new MySqlConnection(_config.GetConnectionString("ppcConn")))
+                {
+                    connection.Open();
+                    MySqlCommand cmdA = new MySqlCommand($" Select idOpti, namaOpti, tglBuat from opti where tglBuat >= date_sub(now(), interval 8 month) order by tglBuat desc ", connection);
+                    using (var reader = await cmdA.ExecuteReaderAsync())
+                    {
+                        while (reader.Read())
+                        {
+                            mst.Add(new projectOpty
+                            {
+                                Number = (string)reader["idOpti"],
+                                Desc = (string)reader["namaOpti"]
+                            });
+                        }
+                    }
+
+                    connection.Close();
+
+                    return mst;
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+       
 
         public async Task<Response> AssignToOtherRowSaves(AssignToOtherDto dto)
         {
             try
             {
                 var rspn = new Response();
-                using (var connection = new MySqlConnection(_config.GetConnectionString("DefaultConnection")))
+                var deadline = dto.deadline == null ? "1900-01-01" : dto.deadline;
+                bool userisValid = false;
+                bool optyisValid = false;
+
+                using (var connppc = new MySqlConnection(_config.GetConnectionString("ppcConn")))
+                {
+                    connppc.Open();
+                    MySqlCommand cmdB = new MySqlCommand($" Select idOpti from opti where idOpti = '{dto.projectopty}' order by tglBuat desc ", connppc);
+                    using (var reader = await cmdB.ExecuteReaderAsync())
+                    {
+                        while (reader.Read())
+                        {
+                            optyisValid = true;
+                        }
+                    }
+                    connppc.Close();
+                }
+
+                using (var connection = new SqlConnection(_config.GetConnectionString("x3dbConn"))) //validate username & fullname
                 {
                     connection.Open();
-                    MySqlCommand command = new MySqlCommand($" INSERT INTO tasks " +
-                        $"(usernameAssign , fullnameAssign, usernameFrom, projectopty, quickvalue, status, signstatus, deadline, note, createDate, createAt)" +
-                        $"VALUES('{dto.usernameAssign}', '{dto.fullnameAssign}', '{dto.usernameFrom}', '{dto.projectopty}', {dto.quickvalue}, '{dto.status}', '{dto.signsatus}', '{dto.deadline}', '{dto.note}', '{DateTime.Now}', '{dto.usernameFrom}')", connection);
+                    SqlCommand command = new SqlCommand($" SPSagex3dbfor360apps 2, '{dto.usernameAssign}', '{dto.fullnameAssign}' ", connection);
                     using (var reader = await command.ExecuteReaderAsync())
                     {
-                        rspn.Msg = $"Tugas untuk {dto.fullnameAssign} berhasil di buat";
+                        while (reader.Read())
+                        {
+                            userisValid = true;
+                        }
                     }
-
-
                     connection.Close();
                 }
+
+
+                using (var connection = new MySqlConnection(_config.GetConnectionString("360dbConn")))
+                {
+                    connection.Open();
+
+                    if (optyisValid && userisValid)
+                    {
+                        MySqlCommand command = new MySqlCommand($" INSERT INTO tasks " +
+                            $"(usernameAssign , fullnameAssign, usernameFrom, projectopty, quickvalue, status, signstatus, deadline, note, createDate, createAt)" +
+                            $"VALUES('{dto.usernameAssign}', '{dto.fullnameAssign}', '{dto.usernameFrom}', '{dto.projectopty}', {dto.quickvalue}, '{dto.status}', '{dto.signsatus}', '{deadline}', '{dto.note}', '{DateTime.Now}', '{dto.usernameFrom}')", connection);
+                        using (var reader = await command.ExecuteReaderAsync())
+                        {
+                            rspn.Msg = $"Tugas untuk {dto.fullnameAssign} berhasil di buat";
+                        }
+                    }
+                    connection.Close();
+                }
+
+                if (!userisValid)
+                {
+                    rspn.isError = true;
+                    rspn.Msg = $" Nama {dto.fullnameAssign} atau Username {dto.usernameAssign}, tidak valid";
+                }
+                else if(!optyisValid)
+                {
+                    rspn.isError = true;
+                    rspn.Msg = $" Project/Opty {dto.projectopty}, tidak valid";
+                } 
+
                 return rspn;
             }
             catch (Exception ex)
@@ -171,17 +279,56 @@ namespace BE_360APP.Models.Repo
             }
         }
 
+        public async Task<List<AssignToOtherGetAll>> AssignToOtherGetAlls(AssignToOtherGetAllDto dto)
+        {
+            try
+            {
+                var mst = new List<AssignToOtherGetAll>();
+                using (var connection = new MySqlConnection(_config.GetConnectionString("360dbConn")))
+                {
+                    connection.Open();
+                    MySqlCommand cmdA = new MySqlCommand($" select id, fullnameAssign, usernameAssign, projectopty, quickvalue, status, signstatus, deadline, note from tasks where usernameFrom = '{dto.usernameFrom}' ", connection);
+                    using (var reader = await cmdA.ExecuteReaderAsync())
+                    {
+                        while (reader.Read())
+                        {
+                            mst.Add(new AssignToOtherGetAll
+                            {
+                                RowId = Convert.ToString((int)reader["id"]),
+                                fullnameAssign = (string)reader["fullnameAssign"] +"|" + (string)reader["usernameAssign"],
+                                usernameAssign = (string)reader["usernameAssign"],
+                                projectopty = (string)reader["projectopty"],
+                                quickvalue = Convert.ToString((int)reader["quickvalue"]),
+                                status = (string)reader["status"],
+                                signstatus = (string)reader["signstatus"],
+                                deadlineday = Convert.ToDateTime((DateTime)reader["deadline"]).Date.Day,
+                                deadlinemonth = Convert.ToDateTime((DateTime)reader["deadline"]).Date.Month,
+                                deadlineyear = Convert.ToDateTime((DateTime)reader["deadline"]).Date.Year,
+                                note = (string)reader["note"],
+                            });
+                        }
+                    }
+
+                    connection.Close();
+
+                    return mst;
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
 
         public async Task<List<Registerfullname>> LookupFullNames(usernameDto dto)
         {
             try
             {
                 List<Registerfullname> dt = new List<Registerfullname>();
-                using (var connection = new SqlConnection(_config.GetConnectionString("x3dbConnection")))
+                using (var connection = new SqlConnection(_config.GetConnectionString("x3dbConn")))
                 {
                     connection.Open();
-                    //var Param1 = dto.username == "null" ? String.Empty : ws.Param1;
-
+                    
                     SqlCommand command = new SqlCommand($" SPSagex3dbfor360apps 1, '{dto.fullname}' ", connection);
                     using (var reader = await command.ExecuteReaderAsync())
                     {
@@ -214,7 +361,7 @@ namespace BE_360APP.Models.Repo
             {
                 var rspn = new Response();
                 int sumUserRegistered = 0;
-                using (var connection = new MySqlConnection(_config.GetConnectionString("DefaultConnection")))
+                using (var connection = new MySqlConnection(_config.GetConnectionString("360dbConn")))
                 {
                     connection.Open();
                     MySqlCommand cmddataisExist = new MySqlCommand($" select id from register where username = '{dto.username}' ", connection);
@@ -252,13 +399,13 @@ namespace BE_360APP.Models.Repo
 
 
 
-
+        /*
         public async Task<List<Dashboard>> Dashboards(whereString ws)
         {
             try
             {
                 List<Dashboard> dtsales = new List<Dashboard>();
-                using (var connection = new MySqlConnection(_config.GetConnectionString("DefaultConnection")))
+                using (var connection = new MySqlConnection(_config.GetConnectionString("360dbConn")))
                 {
                     connection.Open();
                     var Param1 = ws.Param1 == "null" ? String.Empty : ws.Param1;
@@ -282,7 +429,7 @@ namespace BE_360APP.Models.Repo
             {
                 throw new Exception(ex.Message);
             }
-        }
+        }*/
 
     }
 }

@@ -17,7 +17,7 @@ namespace BE_360APP.Controllers
             _repo = repo;
         }
 
-        [HttpGet]
+        /*[HttpGet]
         [Route("Dashboard/{Param1}")]
         public async Task<IActionResult> Dashboard(String? Param1)
         {
@@ -33,7 +33,7 @@ namespace BE_360APP.Controllers
             {
                 return Requests.Response(this, new ApiStatus(500), null, ex.Message);
             }
-        }
+        }*/
 
 
         [HttpPost]
@@ -52,14 +52,29 @@ namespace BE_360APP.Controllers
         }
 
 
-
-        [HttpPost]
-        [Route("master/value")]
-        public async Task<IActionResult> masterValue([FromBody] string dto)
+        [HttpGet]
+        [Route("master/projectopty")]
+        public async Task<IActionResult> masterProjectopty()
         {
             try
             {
-                var dt = await _repo.masterValues();
+                var dt = await _repo.masterProjectopties();
+                return Requests.Response(this, new ApiStatus(200), dt, $"Read Data Successfully");
+            }
+            catch (Exception ex)
+            {
+                return Requests.Response(this, new ApiStatus(500), null, ex.Message);
+            }
+        }
+
+
+        [HttpGet]
+        [Route("master/all")]
+        public async Task<IActionResult> allMaster()
+        {
+            try
+            {
+                var dt = await _repo.allMasters();
                 return Requests.Response(this, new ApiStatus(200), dt, $"Read Data Successfully");
             }
             catch (Exception ex)
@@ -83,6 +98,20 @@ namespace BE_360APP.Controllers
             }
         }
 
+        [HttpPost]
+        [Route("AssignToOther/GetAll")]
+        public async Task<IActionResult> AssignToOtherGetAll([FromBody] AssignToOtherGetAllDto dto)
+        {
+            try
+            {
+                var dt = await _repo.AssignToOtherGetAlls(dto);
+                return Requests.Response(this, new ApiStatus(200), dt, $"Read Data: {dt.Count()} Successfully");
+            }
+            catch (Exception ex)
+            {
+                return Requests.Response(this, new ApiStatus(500), null, ex.Message);
+            }
+        }
 
         [HttpPost]
         [Route("Auth/Register/LookupFullName")]
