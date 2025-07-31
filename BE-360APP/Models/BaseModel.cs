@@ -1,4 +1,6 @@
-﻿namespace BE_360APP.Models
+﻿using Google.Protobuf.WellKnownTypes;
+
+namespace BE_360APP.Models
 {
     public class BaseModel
     {
@@ -7,6 +9,7 @@
 
     public class AssignToOtherDto
     {
+        public int id { get; set; }
         public int idusernameFrom { get; set; }
         public string? usernameFrom { get; set; }
         public string? fullnameFrom { get; set; }
@@ -40,11 +43,12 @@
     {
         public int id { get; set; }
         public string fullName { get; set; }
-        public string usernamePekerja { get; set; }
+        public string usernameFrom { get; set; }
         public string Password { get; set; }
-        public string email { get; set; }
-        public bool isVerify { get; set; }
-        public string role { get; set; }
+        public string position { get; set; }
+        public string templateName { get; set; }
+        public string nip { get; set; }
+        public bool empJunior { get; set; }
     }
 
     public class registerDto
@@ -134,6 +138,198 @@
     public class AssignToOtherGetAllDto
     {
         public string usernameFrom { get; set; }
+    }
+
+    public class responReviewgetall
+    {
+        public int id { get; set; }
+        public string namaKaryawan { get; set; }
+        public DateTime timerequest { get; set; }
+    }
+
+    public class personLayersubmitDto
+    {
+        public int id { get; set; }
+        public string usernameFrom { get; set; }
+        public List<Emp> selectedEmployee { get; set; }
+        public List<pLayer> selectedPersonLayer { get; set; }
+    }
+
+    public class Emp
+    {
+        public string id { get; set; }
+        public string? name { get; set; }
+    }
+
+    public class pLayer
+    {
+        public string id { get; set; }
+        public string? name { get; set; }
+    }
+
+    public class formFastRateDto
+    {
+        public int id { get; set; }
+        public string? usernameFrom { get; set; }
+        public string? idname1 { get; set; }
+        public string? idname2 { get; set; }
+        public List<Emp> selectedPersonJuniors { get; set; }
+    }
+
+    public class ansForm1
+    {
+        public string idKaryawan { get; set; }
+        public string idQuestion { get; set; }
+        public string type { get; set; }
+        public string answer { get; set; }
+        public string remarkdata { get; set; }
+    }
+
+
+    public class ListFastRatingRowSaveDto
+    {
+        public int id { get; set; }
+        public int iduser { get; set; }
+        public string usernameFrom { get; set; }
+        public List<ansForm1> answerForm1 { get; set; }
+    }
+
+    public class Allperson
+    {
+        public List<subordinate> personlayer2 { get; set; }
+        public List<allKaryawan> allKaryawan { get; set; }
+    }
+
+    public class structurformFastRating
+    {
+        public string? fullname { get; set; }
+        public string? divlevel { get; set; }
+        public int status { get; set; }
+        public List<getData>? data { get; set; }
+    }
+
+
+
+    public class genQuestionText
+    {
+        public Int16 id { get; set; }
+        public string questions { get; set; }
+    }
+
+    public class genQuestionRate
+    {
+        public Int16 id { get; set; }
+        public string questions { get; set; }
+    }
+
+    public class question
+    {
+        public int idUser { get; set; }
+        public int id { get; set; }
+        public string questions { get; set; }
+    }
+
+
+    public class additionReview
+    {
+        public int id { get; set; }
+        public string namaKaryawan { get; set; }
+    }
+
+    public class upline
+    {
+        public int id { get; set; }
+        public string namaKaryawan { get; set; }
+    }
+
+    public class allKaryawan
+    {
+        public int id { get; set; }
+        public string namaKaryawan { get; set; }
+        public string Division { get; set; }
+    }
+
+    public class juniorEmployee
+    {
+        public int id { get; set; }
+        public string namaKaryawan { get; set; }
+    }
+
+    public class subordinate
+    {
+        public int id { get; set; }
+        public string namaKaryawan { get; set; }
+    }
+
+    public class peer
+    {
+        public int id { get; set; }
+        public string namaKaryawan { get; set; }
+    }
+
+    public class dataKaryawan
+    {
+        public int idUser { get; set; }
+        public string namaKaryawan { get; set; }
+        public string nama { get; set; }
+        public string namaLevel { get; set; }
+        public string rating { get; set; }
+    }
+
+
+    public class getData
+    {
+        public List<questionsData>? questions { get; set; }
+    }
+
+    public class questionsData
+    {
+        public string? question_id { get; set; }
+        public List<string> fields { get; set; }
+        public string _id { get; set; }
+        public string title { get; set; }
+        public string description { get; set; }
+        public string type { get; set; }
+        public int maxline { get; set; }
+        public bool is_mandatory { get; set; }
+        public bool remark { get; set; }
+    }
+
+    public class fieldsData
+    {
+        public string bodyField { get; set; }
+    }
+
+
+    public class AssignToMeGetAllDto
+    {
+        public string usernameFrom { get; set; }
+    }
+
+
+    public class AssignToMeGetAll
+    {
+        public string RowId { get; set; }
+        public string fullnameAssign { get; set; }
+        public string usernameAssign { get; set; }
+        public string projectopty { get; set; }
+        public string quickvalue { get; set; }
+        public string status { get; set; }
+        public string signstatus { get; set; }
+        //public DateTime deadline { get; set; }
+        public int deadlineyear { get; set; }
+        public int deadlinemonth { get; set; }
+        public int deadlineday { get; set; }
+        public string note { get; set; }
+    }
+
+
+    public class fullnameAndid
+    {
+        public string idpengajuantask { get; set; }
+        public string iduser { get; set; }
+        public string fullname { get; set; }
+        public string ratee { get; set; }
     }
 
 
