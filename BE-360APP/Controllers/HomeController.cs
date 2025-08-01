@@ -122,7 +122,7 @@ namespace BE_360APP.Controllers
             try
             {
                 var dt = await _repo.formFastRatesresponReviewnextForm(dto);
-                return Requests.Response(this, new ApiStatus(200), dt, "Karyawan junior sukses terpilih");
+                return Requests.Response(this, new ApiStatus(200), dt, "Karyawan sukses terpilih");
             }
             catch (Exception ex)
             {

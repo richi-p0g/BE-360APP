@@ -1,5 +1,6 @@
 ﻿
 using System.Data.SqlClient;
+using System.Linq;
 using System.Security.Policy;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -379,7 +380,7 @@ namespace BE_360APP.Models.Repo
                     connection.Open();
 
                     //Layer 1
-                    MySqlCommand cmd = new MySqlCommand($" select u4.id, u4.namaKaryawan from question q  join template t on q.idTemplate = t.id  join user360 u on t.id = u.idTemplate  join peer p on p.usernamePertama = u.username  join hierarki hbawahan on hbawahan.usernameAtasan = u.username  join divisi d on d.id = u.idDivisi  join level l on l.id = u.idLevel  join user360 u4 on u4.username = hbawahan.usernameBawahan  where u.username = '{dto.usernameFrom}' group by u4.namaKaryawan asc  ", connection);
+                    MySqlCommand cmd = new MySqlCommand($" select u4.id, u4.namaKaryawan from question q  join template t on q.idTemplate = t.id  join user360 u on t.id = u.idTemplate  join peer p on p.usernamePertama = u.username  join hierarki hbawahan on hbawahan.usernameAtasan = u.username  join divisi d on d.id = u.idDivisi  join level l on l.id = u.idLevel  join user360 u4 on u4.username = hbawahan.usernameBawahan  where u.username = '{dto.usernameFrom}'  and u4.id not in ( select u.id from histreviewquestion h  join user360 u on u.username = h.usernameYgDireview  where quarter(NOW()) = quarter(waktuIsi) and h.usernameYgDireview  = u.username  ) group by u4.namaKaryawan asc ", connection);
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         while (reader.Read())
@@ -415,26 +416,22 @@ namespace BE_360APP.Models.Repo
 
                     if(dto.selectedPersonLayer.Count() > 0)
                     {
-                        //foreach (var pLayer in dto.selectedPersonLayer)
-                        //{
-                        //    MySqlCommand cmd = new MySqlCommand($"  ", connection);
-                        //    await cmd.ExecuteNonQueryAsync();
-                        //}
+                        foreach (var pLayer in dto.selectedPersonLayer)
+                        {
+                            MySqlCommand cmd = new MySqlCommand($" INSERT INTO requestreview (usernameYangRequest, usernameYangMemberi, waktuRequest) VALUES ((select username from user360 where id = {dto.id}), (select username from user360 where id = {pLayer.id}), NOW()) ", connection);
+                            await cmd.ExecuteNonQueryAsync();
+                        }
                     }
-
 
                     if (dto.selectedEmployee.Count() > 0)
                     {
-                        //foreach (var emp in dto.selectedEmployee)
-                        //{
-                        //    MySqlCommand command = new MySqlCommand($"  ", connection);
-                        //    await command.ExecuteReaderAsync();
-                        //}
+                        foreach (var emp in dto.selectedEmployee)
+                        {
+                            MySqlCommand command = new MySqlCommand($" INSERT INTO requestreview (usernameYangRequest, usernameYangMemberi, waktuRequest) VALUES ((select username from user360 where id = {dto.id}), (select username from user360 where id = {emp.id}), NOW())  ", connection);
+                            await command.ExecuteReaderAsync();
+                        }
                         rspn.Msg = $"Feedback submitted successfully!";
 
-                    } else {
-                        rspn.isError = true;
-                        rspn.Msg = $"Please select at least one Karyawan to provide feedback.";
                     }
 
                     connection.Close();
@@ -1083,7 +1080,7 @@ namespace BE_360APP.Models.Repo
 
                     //Layer 2 etc
                     var sb2 = new List<subordinate>();
-                    MySqlCommand cmd = new MySqlCommand($" select u5.id, u5.namaKaryawan sobordinate from question q   join template t on q.idTemplate = t.id   join user360 u on t.id = u.idTemplate   join hierarki hbawahan on hbawahan.usernameAtasan = u.username join user360 u4 on u4.username = hbawahan.usernameBawahan  join hierarki hbawahan2 on hbawahan2.usernameAtasan = u4.username join user360 u5 on u5.username = hbawahan2.usernameBawahan  where u.username = '{dto.usernameFrom}' group by u5.namaKaryawan asc   ", connection);
+                    MySqlCommand cmd = new MySqlCommand($" select u5.id, u5.namaKaryawan sobordinate from question q   join template t on q.idTemplate = t.id   join user360 u on t.id = u.idTemplate   join hierarki hbawahan on hbawahan.usernameAtasan = u.username join user360 u4 on u4.username = hbawahan.usernameBawahan  join hierarki hbawahan2 on hbawahan2.usernameAtasan = u4.username join user360 u5 on u5.username = hbawahan2.usernameBawahan  where u.username = '{dto.usernameFrom}' and u5.id not in (select u.id from histreviewquestion h  join user360 u on u.username = h.usernameYgDireview  where quarter(NOW()) = quarter(waktuIsi) and h.usernamePembuat = u.username  ) group by u5.namaKaryawan asc   ", connection);
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         while (reader.Read())
@@ -1099,7 +1096,7 @@ namespace BE_360APP.Models.Repo
 
                     //Layer 1 subordinate
                     var sb = new List<subordinate>();
-                    MySqlCommand cmdsubordinate = new MySqlCommand($" select u4.id, u4.namaKaryawan sobordinate from question q  join template t on q.idTemplate = t.id  join user360 u on t.id = u.idTemplate  join peer p on p.usernamePertama = u.username  join hierarki hbawahan on hbawahan.usernameAtasan = u.username  join divisi d on d.id = u.idDivisi  join level l on l.id = u.idLevel  join user360 u4 on u4.username = hbawahan.usernameBawahan  where u.username = '{dto.usernameFrom}' group by u4.namaKaryawan desc ", connection);
+                    MySqlCommand cmdsubordinate = new MySqlCommand($" select u4.id, u4.namaKaryawan sobordinate from question q  join template t on q.idTemplate = t.id  join user360 u on t.id = u.idTemplate  join peer p on p.usernamePertama = u.username  join hierarki hbawahan on hbawahan.usernameAtasan = u.username  join divisi d on d.id = u.idDivisi  join level l on l.id = u.idLevel  join user360 u4 on u4.username = hbawahan.usernameBawahan  where u.username = '{dto.usernameFrom}' and u5.id not in ( select u.id from histreviewquestion h  join user360 u on u.username = h.usernameYgDireview  where quarter(NOW()) = quarter(waktuIsi) and h.usernamePembuat = u.username  ) group by u4.namaKaryawan desc ", connection);
                     using (var reader = await cmdsubordinate.ExecuteReaderAsync())
                     {
                         while (reader.Read())
@@ -1112,10 +1109,11 @@ namespace BE_360APP.Models.Repo
                         }
                     }
 
+                    sb2.AddRange(sb);
 
-                    //pilih karyawan review tambahan
+                    //pilih all review karyawan sxadd
                     var allkrywn = new List<allKaryawan>();
-                    MySqlCommand cmdpilkar = new MySqlCommand($" select u.id, u.namaKaryawan, d.nama division from user360 u  join divisi d on d.id = u.idDivisi  join level l on l.id = u.idLevel order by u.namaKaryawan asc ", connection);
+                    MySqlCommand cmdpilkar = new MySqlCommand($" select u.id, u.namaKaryawan, d.nama division from user360 u join divisi d on d.id = u.idDivisi  join level l on l.id = u.idLevel where u.id not in ({string.Join(", ", sb2.Select(s=>s.id)).ToList()}) order by u.namaKaryawan asc ", connection);
                     using (var reader = await cmdpilkar.ExecuteReaderAsync())
                     {
                         while (reader.Read())
@@ -1130,7 +1128,6 @@ namespace BE_360APP.Models.Repo
                     }
                     connection.Close();
 
-                    sb2.AddRange(sb);
                     person.personlayer2.AddRange(sb2);
                     person.allKaryawan.AddRange(allkrywn);
 
@@ -1144,6 +1141,7 @@ namespace BE_360APP.Models.Repo
             }
         }
 
+        //insert HERE
         public async Task<Response> formFastRatesubmitForms(ListFastRatingRowSaveDto dto)
         {
             try
@@ -1152,17 +1150,58 @@ namespace BE_360APP.Models.Repo
                 using (var connection = new MySqlConnection(_config.GetConnectionString("360dbConn")))
                 {
                     connection.Open();
-
-                    //insert Form POG 360 Feedback
-                    foreach (var attr in dto.answerForm1)
+                    using (var tran = connection.BeginTransaction())
                     {
-                        MySqlCommand cmd = new MySqlCommand($"  ", connection);
-                        await cmd.ExecuteNonQueryAsync();
+                        try
+                        {
+                            // General rating header
+                            var forms = dto.answerForm1.Where(W => W.type == "dropdown" && W.remarkdata == "");
+                            foreach (var attr in forms.GroupBy(g => g.idKaryawan))
+                            {
+                                var averageScore = attr.Select(s=>s.answer.Split(',').Select(int.Parse).Sum()).FirstOrDefault() / attr.Select(s => s.answer.Count()).FirstOrDefault();
+
+                                MySqlCommand cmd = new MySqlCommand($"INSERT INTO histratingquestiongeneral (usernameYgIsi, UsernameYgRequest, waktuIsi, idRequest, totalNilai) VALUES ((select username from user360 u where u.id = {attr.Select(s=> s.idKaryawan)}), {dto.usernameFrom}, NOW(), 1, {averageScore})", connection);
+                                await cmd.ExecuteNonQueryAsync();
+                            }
+
+
+                            // General rating detail
+                            int w = 1;
+                            foreach (var attr in forms)
+                            {
+                                var idQuest = attr.idQuestion == forms.Select(s => s.idQuestion).OrderByDescending(q => q).FirstOrDefault() ? w++ : w;
+                                MySqlCommand cmd = new MySqlCommand($" INSERT INTO reviewgeneralrating (idHistReview, idQuestion, nilai) VALUES((select id+{idQuest} id from histratingquestiongeneral order by id desc limit 1), {attr.idQuestion}, {attr.answer}) ", connection);
+                                await cmd.ExecuteNonQueryAsync();
+                            }
+
+
+
+
+
+
+                            // General text  
+                            foreach (var attr in dto.answerForm1.Where(W => W.type == "text" && W.remarkdata != null))
+                            {
+                                MySqlCommand cmd = new MySqlCommand($"INSERT INTO some_table (column_name) VALUES ('{attr.remarkdata}')", connection);
+                                await cmd.ExecuteNonQueryAsync();
+                            }
+
+                            // Review question  
+                            foreach (var attr in dto.answerForm1.Where(W => W.type == "dropdown" && W.remarkdata != null))
+                            {
+                                MySqlCommand cmd = new MySqlCommand($"INSERT INTO another_table (column_name) VALUES ('{attr.remarkdata}')", connection);
+                                await cmd.ExecuteNonQueryAsync();
+                            }
+
+                            tran.Commit();
+                        }
+                        catch (Exception ex)
+                        {
+                            tran.Rollback();
+                            throw new Exception(ex.Message);
+                        }
                     }
-
-
                     connection.Close();
-
                     return respon;
                 }
             }
