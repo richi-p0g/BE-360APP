@@ -5,6 +5,7 @@ using System.Security.Policy;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using MySqlConnector;
+using Mysqlx.Crud;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
@@ -413,27 +414,42 @@ namespace BE_360APP.Models.Repo
                 using (var connection = new MySqlConnection(_config.GetConnectionString("360dbConn")))
                 {
                     connection.Open();
-
-                    if(dto.selectedPersonLayer.Count() > 0)
+                    using (var tran = connection.BeginTransaction())
                     {
-                        foreach (var pLayer in dto.selectedPersonLayer)
+                        try
                         {
-                            MySqlCommand cmd = new MySqlCommand($" INSERT INTO requestreview (usernameYangRequest, usernameYangMemberi, waktuRequest) VALUES ((select username from user360 where id = {dto.id}), (select username from user360 where id = {pLayer.id}), NOW()) ", connection);
-                            await cmd.ExecuteNonQueryAsync();
+                            if (dto.selectedPersonLayer.Count() > 0)
+                            {
+                                foreach (var pLayer in dto.selectedPersonLayer)
+                                {
+                                     MySqlCommand cmd = new MySqlCommand();
+                                     cmd = new MySqlCommand($" INSERT INTO requestreview (usernameYangRequest, usernameYangMemberi, waktuRequest) VALUES ((select username from user360 where id = {dto.id}), (select username from user360 where id = {pLayer.id}), NOW()) ", connection);
+                                     cmd.Transaction = tran;
+                                     await cmd.ExecuteNonQueryAsync();
+                                }
+                            }
+
+                            if (dto.selectedEmployee.Count() > 0)
+                            {
+                                foreach (var emp in dto.selectedEmployee)
+                                {
+                                    
+                                    MySqlCommand command = new MySqlCommand();
+                                    command = new MySqlCommand($" INSERT INTO requestreview (usernameYangRequest, usernameYangMemberi, waktuRequest) VALUES ((select username from user360 where id = {dto.id}), (select username from user360 where id = {emp.id}), NOW())  ", connection);
+                                    command.Transaction = tran;
+                                    await command.ExecuteNonQueryAsync();
+                                }
+                                rspn.Msg = $"Feedback submitted successfully!";
+                            }
+
+                            tran.Commit();
+                        }
+                        catch (Exception ex)
+                        {
+                            tran.Rollback();
+                            throw new Exception(ex.Message);
                         }
                     }
-
-                    if (dto.selectedEmployee.Count() > 0)
-                    {
-                        foreach (var emp in dto.selectedEmployee)
-                        {
-                            MySqlCommand command = new MySqlCommand($" INSERT INTO requestreview (usernameYangRequest, usernameYangMemberi, waktuRequest) VALUES ((select username from user360 where id = {dto.id}), (select username from user360 where id = {emp.id}), NOW())  ", connection);
-                            await command.ExecuteReaderAsync();
-                        }
-                        rspn.Msg = $"Feedback submitted successfully!";
-
-                    }
-
                     connection.Close();
                 }
 
@@ -1096,7 +1112,7 @@ namespace BE_360APP.Models.Repo
 
                     //Layer 1 subordinate
                     var sb = new List<subordinate>();
-                    MySqlCommand cmdsubordinate = new MySqlCommand($" select u4.id, u4.namaKaryawan sobordinate from question q  join template t on q.idTemplate = t.id  join user360 u on t.id = u.idTemplate  join peer p on p.usernamePertama = u.username  join hierarki hbawahan on hbawahan.usernameAtasan = u.username  join divisi d on d.id = u.idDivisi  join level l on l.id = u.idLevel  join user360 u4 on u4.username = hbawahan.usernameBawahan  where u.username = '{dto.usernameFrom}' and u5.id not in ( select u.id from histreviewquestion h  join user360 u on u.username = h.usernameYgDireview  where quarter(NOW()) = quarter(waktuIsi) and h.usernamePembuat = u.username  ) group by u4.namaKaryawan desc ", connection);
+                    MySqlCommand cmdsubordinate = new MySqlCommand($" select u4.id, u4.namaKaryawan sobordinate from question q  join template t on q.idTemplate = t.id  join user360 u on t.id = u.idTemplate  join peer p on p.usernamePertama = u.username  join hierarki hbawahan on hbawahan.usernameAtasan = u.username  join divisi d on d.id = u.idDivisi  join level l on l.id = u.idLevel  join user360 u4 on u4.username = hbawahan.usernameBawahan  where u.username = '{dto.usernameFrom}' and u4.id not in ( select u.id from histreviewquestion h  join user360 u on u.username = h.usernameYgDireview  where quarter(NOW()) = quarter(waktuIsi) and h.usernamePembuat = u.username  ) group by u4.namaKaryawan desc ", connection);
                     using (var reader = await cmdsubordinate.ExecuteReaderAsync())
                     {
                         while (reader.Read())
@@ -1111,9 +1127,14 @@ namespace BE_360APP.Models.Repo
 
                     sb2.AddRange(sb);
 
-                    //pilih all review karyawan sxadd
+                    //pilih all review karyawan
                     var allkrywn = new List<allKaryawan>();
-                    MySqlCommand cmdpilkar = new MySqlCommand($" select u.id, u.namaKaryawan, d.nama division from user360 u join divisi d on d.id = u.idDivisi  join level l on l.id = u.idLevel where u.id not in ({string.Join(", ", sb2.Select(s=>s.id)).ToList()}) order by u.namaKaryawan asc ", connection);
+                    var q = $" select u.id, u.namaKaryawan, d.nama division from user360 u join divisi d on d.id = u.idDivisi  join level l on l.id = u.idLevel ";
+
+                    if (sb2.Count() > 0) q += $"where u.id not in ({string.Join(", ", sb2.Select(s => s.id))})";
+                    q += "order by u.namaKaryawan asc";
+
+                    MySqlCommand cmdpilkar = new MySqlCommand(q, connection);
                     using (var reader = await cmdpilkar.ExecuteReaderAsync())
                     {
                         while (reader.Read())
@@ -1154,44 +1175,59 @@ namespace BE_360APP.Models.Repo
                     {
                         try
                         {
-                            // General rating header
-                            var forms = dto.answerForm1.Where(W => W.type == "dropdown" && W.remarkdata == "");
+                            // General rating header detail
+                            var forms = dto.answerForm1.Where(W => W.type == "dropdown" && W.remarkdata == "null");
                             foreach (var attr in forms.GroupBy(g => g.idKaryawan))
                             {
-                                var averageScore = attr.Select(s=>s.answer.Split(',').Select(int.Parse).Sum()).FirstOrDefault() / attr.Select(s => s.answer.Count()).FirstOrDefault();
-
-                                MySqlCommand cmd = new MySqlCommand($"INSERT INTO histratingquestiongeneral (usernameYgIsi, UsernameYgRequest, waktuIsi, idRequest, totalNilai) VALUES ((select username from user360 u where u.id = {attr.Select(s=> s.idKaryawan)}), {dto.usernameFrom}, NOW(), 1, {averageScore})", connection);
+                                var averageScore = attr.Select(s => s.answer.Split(',').Select(int.Parse).Sum()).FirstOrDefault() / attr.Select(s => s.answer.Count()).FirstOrDefault();
+                                MySqlCommand cmd = new MySqlCommand($"INSERT INTO histratingquestiongeneral (usernameYgIsi, UsernameYgRequest, waktuIsi, idRequest, totalNilai) VALUES ('{dto.usernameFrom}', (select username from user360 u where u.id = {attr.Select(s => s.idKaryawan).FirstOrDefault()}), NOW(), 0, {averageScore})", connection);
+                                cmd.Transaction = tran;
                                 await cmd.ExecuteNonQueryAsync();
+
+                                foreach (var attr1 in forms.Where(w => w.idKaryawan == attr.Select(s => s.idKaryawan).FirstOrDefault()))
+                                {
+                                    MySqlCommand cmd1 = new MySqlCommand($" INSERT INTO reviewgeneralrating (idHistReview, idQuestion, nilai) VALUES((select id from histratingquestiongeneral order by id desc limit 1), {attr1.idQuestion}, '{attr1.answer}') ", connection);
+                                    cmd1.Transaction = tran;
+                                    await cmd1.ExecuteNonQueryAsync();
+                                }
                             }
 
 
-                            // General rating detail
-                            int w = 1;
-                            foreach (var attr in forms)
+                            // General text header detail
+                            var forms1 = dto.answerForm1.Where(W => W.type == "text" && W.remarkdata == "null");
+                            foreach (var attr in forms1.GroupBy(g => g.idKaryawan))
                             {
-                                var idQuest = attr.idQuestion == forms.Select(s => s.idQuestion).OrderByDescending(q => q).FirstOrDefault() ? w++ : w;
-                                MySqlCommand cmd = new MySqlCommand($" INSERT INTO reviewgeneralrating (idHistReview, idQuestion, nilai) VALUES((select id+{idQuest} id from histratingquestiongeneral order by id desc limit 1), {attr.idQuestion}, {attr.answer}) ", connection);
+                                MySqlCommand cmd = new MySqlCommand($" INSERT INTO histfreetextquestiongeneral (usernameYgRequest, usernameYgIsi, waktuIsi, idRequest) VALUES((select username from user360 u where u.id = {attr.Select(s => s.idKaryawan).FirstOrDefault()}), '{dto.usernameFrom}', NOW(), 0); ", connection);
+                                cmd.Transaction = tran;
                                 await cmd.ExecuteNonQueryAsync();
+
+                                foreach (var attr1 in forms1.Where(w => w.idKaryawan == attr.Select(s => s.idKaryawan).FirstOrDefault()))
+                                {
+                                    MySqlCommand cmd1 = new MySqlCommand($" INSERT INTO reviewgeneralfreetext (idHistReview, idQuestion, komentar) VALUES((select id from histfreetextquestiongeneral order by id desc limit 1), {attr1.idQuestion}, '{attr1.answer}') ", connection);
+                                    cmd1.Transaction = tran;
+                                    await cmd1.ExecuteNonQueryAsync();
+                                }
                             }
 
 
-
-
-
-
-                            // General text  
-                            foreach (var attr in dto.answerForm1.Where(W => W.type == "text" && W.remarkdata != null))
+                            // spesific question header detail
+                            var forms2 = dto.answerForm1.Where(W => W.type == "dropdown" && W.remarkdata != "null");
+                            foreach (var attr in forms2.GroupBy(g => g.idKaryawan))
                             {
-                                MySqlCommand cmd = new MySqlCommand($"INSERT INTO some_table (column_name) VALUES ('{attr.remarkdata}')", connection);
+                                var averageScore = attr.Select(s => s.answer.Split(',').Select(int.Parse).Sum()).FirstOrDefault() / attr.Select(s => s.answer.Count()).FirstOrDefault();
+                                MySqlCommand cmd = new MySqlCommand($" INSERT INTO histreviewquestion (idRequest, usernamePembuat, usernameYgDireview, waktuIsi, totalNilai) VALUES(0, '{dto.usernameFrom}', (select username from user360 u where u.id = {attr.Select(s => s.idKaryawan).FirstOrDefault()}), NOW(), {averageScore}) ", connection);
+                                cmd.Transaction = tran;
                                 await cmd.ExecuteNonQueryAsync();
+
+
+                                foreach (var attr1 in forms2.Where(w => w.idKaryawan == attr.Select(s => s.idKaryawan).FirstOrDefault()))
+                                {
+                                    MySqlCommand cmd1 = new MySqlCommand($" INSERT INTO reviewquestion (idHistReview, idQuestion, nilai, komentar) VALUES((select id from histreviewquestion order by id desc limit 1), {attr1.idQuestion}, '{attr1.answer}', '{attr1.remarkdata}') ", connection);
+                                    cmd1.Transaction = tran;
+                                    await cmd1.ExecuteNonQueryAsync();
+                                }
                             }
 
-                            // Review question  
-                            foreach (var attr in dto.answerForm1.Where(W => W.type == "dropdown" && W.remarkdata != null))
-                            {
-                                MySqlCommand cmd = new MySqlCommand($"INSERT INTO another_table (column_name) VALUES ('{attr.remarkdata}')", connection);
-                                await cmd.ExecuteNonQueryAsync();
-                            }
 
                             tran.Commit();
                         }
